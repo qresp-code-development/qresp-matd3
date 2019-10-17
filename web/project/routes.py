@@ -142,11 +142,34 @@ def qrespcurator():
         publishform.server.choices = [(qrespserver['qresp_server_url'], qrespserver['qresp_server_url']) for qrespserver in
                                serverslist.getServersList()]
 
+        use_matd3 = 'use-matd3' in session
+        matd3_add_data_url = (f'{session.get("MATD3_URL")}/materials/add-data?return-url=/matd3')
+        if use_matd3:
+            chartform.make_fields_readonly()
+            referenceform.make_fields_readonly()
+        if session.get('matd3-reference'):
+            matd3_ref = session.get('matd3-reference')
+            authors = [{'firstName': a['first_name'], 'lastName': a['last_name']}
+                       for a in matd3_ref['authors']]
+            referenceform = ReferenceForm(
+                kind=matd3_ref['kind'],
+                DOI=matd3_ref['DOI'],
+                authors=authors,
+                title=matd3_ref['title'],
+                page=matd3_ref['page'],
+                publishedAbstract=matd3_ref['publishedAbstract'],
+                volume=matd3_ref['volume'],
+                year=matd3_ref['year'],
+                URLs=matd3_ref['URLs'])
+            referenceform.journal = JournalForm(fullName=matd3_ref['journal'])
+            matd3_add_data_url = f'{matd3_add_data_url}&reference={matd3_ref["pk"]}'
+
         return render_template('curatordetails.html', detailsform=detailsform, serverform=serverform,
                                projectform=projectform, infoform=infoform, referenceform=referenceform, chartlistform=chartlist, chartform=chartform,
                                toollistform=toollist, toolform=toolform, datasetlistform=datasetlist,
                                datasetform=datasetform, scriptlistform=scriptlist, scriptform=scriptform,
-                               documentationform=documentationform, publishform=publishform)
+                               documentationform=documentationform, publishform=publishform,
+                               use_matd3=use_matd3, matd3_add_data_url=matd3_add_data_url, matd3_url=session.get("MATD3_URL"))
 
 
 @app.route('/details', methods=['POST'])
@@ -167,6 +190,16 @@ def server():
     Stores the server on which data lives
     """
     form = ServerForm(request.form)
+    # First test if attempting to connect to a MatD3 instance
+    matd3_url = form.other.data.strip('/')
+    try:
+        req = requests.head(f'{matd3_url}/materials/submit-data', verify=False)
+        if req.status_code < 400:
+            session['MATD3_URL'] = matd3_url
+            session['use-matd3'] = True
+            return {'use-matd3': True}
+    except Exception:
+        pass
     try:
         serverslist = Servers()
         form.hostUrl.choices = [(qrespserver['http_server_url'].strip('/'), qrespserver['http_server_url'].strip('/')) for qrespserver in
@@ -525,6 +558,9 @@ def download():
     except:
         projectName = tempName
         previewFolder = tempName
+    if 'use-matd3' in session:
+        fileServerPath = session['fileServerPath']
+        previewFolder = session['previewFolder']
     projectForm = ProjectForm(downloadPath = downloadPath, fileServerPath = fileServerPath, notebookPath = notebookPath,
                               ProjectName = projectName, gitPath = gitPath, insertedBy = insertedBy,
                               isPublic = True, timeStamp = pubdate,
@@ -563,6 +599,8 @@ def publish():
         serverpathList = fileServerPath.rsplit("/", 2)
         previewFolder = serverpathList[len(serverpathList)-2] + "_" + serverpathList[len(serverpathList)-1]
         error = []
+        if 'use-matd3' in session:
+            previewFolder = session['previewFolder']
         try:
             with open("papers/"+previewFolder+"/data.json", "r") as jsonData:
                 error = serverslist.validateSchema(json.load(jsonData))
@@ -623,6 +661,8 @@ def authorized():
                     fileServerPath = session.get(CURATOR_FIELD.PROJECT, {}).get("fileServerPath", "")
                     serverpathList = fileServerPath.rsplit("/", 2)
                     previewFolder = serverpathList[len(serverpathList) - 2] + "_" + serverpathList[len(serverpathList) - 1]
+                    if 'use-matd3' in session:
+                        previewFolder = session['previewFolder']
                     with open("papers/" + previewFolder + "/data.json", "r") as jsonData:
                         senddescriptor = SendDescriptor(server)
                         jsondata = json.load(jsonData)
@@ -706,6 +746,65 @@ def downloadfile(file=None):
             msg = {"Content":"Not Found"}
             return jsonify(msg),400
 
+
+@app.route('/matd3', methods=['GET'])
+def matd3():
+    """Fetch data from MatD3 and prefill forms in Qresp."""
+    dataset = requests.get(
+        f'{session.get("MATD3_URL")}/materials/datasets/'
+        f'{request.args.get("pk")}/info', verify=False).json()
+    pk = dataset['pk']
+    session['fileServerPath'] = session.get('MATD3_URL')
+    session['previewFolder'] = uuid.uuid4().hex
+    session['downloadPath'] = 'materials'
+    if not session.get("ProjectName"):
+        session['ProjectName'] = f'materials_{pk}'
+    if dataset['caption']:
+        caption = dataset['caption']
+    else:
+        caption = f'dataset {pk}'
+    properties = [dataset['primary_property']['name']]
+    if dataset['primary_unit']:
+        properties[-1] += f' ({dataset["primary_unit"]["label"]})'
+    if dataset['secondary_property']:
+        properties.append(dataset["secondary_property"]["name"])
+    if dataset['secondary_unit']:
+        properties[-1] += f' ({dataset["secondary_unit"]["label"]})'
+    chartList = deepcopy(session.get('charts', []))
+    chartList.append({
+        'id': '',
+        'caption': caption,
+        'number': str(len(chartList) + 1),
+        'files': f'materials/datasets/{pk}/files/',
+        'imageFile': f'media/qresp/dataset_{pk}/figure.png',
+        'notebookFile': '',
+        'properties': properties,
+        'saveas': f'dataset_{pk}.png',
+        'extraFields': [
+            {
+                'extrakey': '',
+                'extravalue': ''
+            }
+        ]
+    })
+    session['charts'] = deepcopy(chartList)
+    reference = requests.get(
+        f'{session.get("MATD3_URL")}/materials/references/'
+        f'{dataset["reference"]["id"]}', verify=False).json()
+    session['matd3-reference'] = {
+        'pk': reference['pk'],
+        'kind': 'journal',
+        'DOI': reference['doi_isbn'] if reference['doi_isbn'] else 'doi',
+        'authors': reference['authors'],
+        'title': reference['title'],
+        'journal': reference['journal'],
+        'page': reference['pages_start'],
+        'publishedAbstract': '',
+        'volume': reference['vol'],
+        'year': reference['year'],
+        'URLs': '',
+    }
+    return redirect(url_for('qrespcurator'))
 
 
 ########################################EXPLORER#############################################################################

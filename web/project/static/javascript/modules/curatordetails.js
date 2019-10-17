@@ -59,6 +59,9 @@ $(function(){
             url: "server",
             data: $('#serverform').serialize(), // serializes the form's elements.
             success: function (data) {
+              if (data['use-matd3']) {
+                window.location.href = 'qrespcurator';
+              } else {
                 $('#treeServerModal').modal('show');
                 if(data.data['kind'].includes("HTTP")){
                     callTreeData({'treeUrl':data.data['hostUrl']});
@@ -68,6 +71,7 @@ $(function(){
                 }else{
                     callTreeData({'treeUrl':data.data['other']});
                 }
+              }
             }
         });
         e.preventDefault(); // block the traditional submission of the form.

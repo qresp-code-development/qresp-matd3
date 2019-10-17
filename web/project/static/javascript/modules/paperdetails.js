@@ -320,6 +320,7 @@ function buildChartTables(chartDetails, paperDetails) {
                                                 : file
                                                     .substring(file
                                                         .lastIndexOf("/") + 1);
+                                          if (fileName === '') fileName = 'files.zip';
 
                                             filesLink += "<a href='"
                                                 + $

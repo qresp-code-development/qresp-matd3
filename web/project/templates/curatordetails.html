@@ -35,7 +35,6 @@
         </div>
     </div>
 
-
     <div id="accordion" class="mt-3">
         {# Who is curating sections  #}
         <div class="custom-card" id="editCurator">
@@ -163,9 +162,9 @@
                             <table id="piTable">
                                 {% for name in infoform.PIs %}
                                 <tr data-toggle="fieldset-entry" id="entry">
-                                    <td style="padding-bottom: 1rem; width:35%;">{{ name.firstName(class_='form-control',title=name.firstName.description,**{'data-toggle': 'tooltip'}) }}</td>
-                                    <td style="padding-bottom: 1rem; width:25%;">{{ name.middleName(class_='form-control',title=name.middleName.description,**{'data-toggle': 'tooltip'}) }}</td>
-                                    <td style="padding-bottom: 1rem; width:35%;">{{ name.lastName(class_='form-control',title=name.lastName.description,**{'data-toggle': 'tooltip'}) }}</td>
+                                    <td style="padding-bottom: 1rem; width:35%;">{{ name.firstName(class_='form-control',title=name.firstName.description,**{'data-toggle': 'tooltip', 'readonly': false}) }}</td>
+                                    <td style="padding-bottom: 1rem; width:25%;">{{ name.middleName(class_='form-control',title=name.middleName.description,**{'data-toggle': 'tooltip', 'readonly': false}) }}</td>
+                                    <td style="padding-bottom: 1rem; width:35%;">{{ name.lastName(class_='form-control',title=name.lastName.description,**{'data-toggle': 'tooltip', 'readonly': false}) }}</td>
                                     <td style="padding-bottom: 1rem;"><button type="button" class="btn btn-theme-colored" data-toggle="fieldset-remove-row" id="PIs-{{loop.index0}}-remove">-</button></td>
                                 </tr>
                                 {% endfor %}
@@ -298,10 +297,39 @@
                     <div class="row mb-3">
                         <div class="col-md-12">
                            <span class="input-group-btn">
-                                 <input type="button" id="btnChart"
-                                        name="general_add_button" value="Add Chart"
-                                        class="btn btn-theme-colored btn-lg m-0" title="Add new chart"
-                                        style="font-weight: bold; height: 50px;" data-toggle='modal' data-target='#chartModal' onclick="$('#chartform')[0].reset(); $('#btnChartDelete').hide();">
+                             {% if use_matd3 %}
+                               <div class="row">
+                                 <div class="col-md-2">
+                                   <input type="submit" value="Add new"
+                                          class="btn btn-theme-colored btn-lg"
+                                          style="font-weight: bold;"
+                                          onclick="window.location='{{ matd3_add_data_url }}';">
+                                 </div>
+                                 <div class="col-md-10">
+                                   <div class="input-group" style="margin-left:-30px;">
+                                     <div class="input-group-prepend">
+                                       <label class="input-group-text" style="font-weight: bold;">
+                                         Import existing data set
+                                       </label>
+                                     </div>
+                                     <input id="matd3-import-dataset-id"
+                                            type="number" min="1" style="width: 100px;">
+                                     <div class="input-group-append">
+                                       <button id="matd3-import-btn" type="button"
+                                               class="btn btn-theme-colored btn-lg"
+                                               style="font-weight: bold;">
+                                         Submit
+                                       </button>
+                                     </div>
+                                   </div>
+                                 </div>
+                               </div>
+                               {% else %}
+                               <input type="button" id="btnChart"
+                                      name="general_add_button" value="Add Chart"
+                                      class="btn btn-theme-colored btn-lg m-0" title="Add new chart"
+                                      style="font-weight: bold; height: 50px;" data-toggle='modal' data-target='#chartModal' onclick="$('#chartform')[0].reset(); $('#btnChartDelete').hide();">
+                             {% endif %}
                            </span>
                         </div>
                     </div>
@@ -360,6 +388,7 @@
         </div>
 
 
+        {% if not use_matd3 %}
         {# Where is the dataset located#}
         <div class="custom-card" id="editDataset">
             <div class="card-header">
@@ -395,6 +424,7 @@
                 </div>
             </div>
         </div>
+        {% endif %}
 
         {# Where is the scripts located#}
         <div class="custom-card" id="editScript">
@@ -935,12 +965,32 @@
         buildServerTable({{ projectform.data|tojson }});
         buildInfoTable({{ infoform.data|tojson }});
         buildReferenceTable({{ referenceform.data|tojson }});
+        {% if matd3_url %}
+        buildChartTables({{ chartlistform|tojson }},{{ matd3_url|tojson }});
+        {% else %}
         buildChartTables({{ chartlistform|tojson }},{{ projectform.data.fileServerPath|tojson }});
+        {% endif %}
         buildToolTables({{ toollistform|tojson }},{{ projectform.data.fileServerPath|tojson }});
         buildDatasetTables({{ datasetlistform|tojson }},{{ projectform.data.fileServerPath|tojson }});
         buildScriptTables({{ scriptlistform|tojson }},{{ projectform.data.fileServerPath|tojson }});
         buildDocumentationTable({{ documentationform.data|tojson }});
         addToWorkflow();
+    </script>
+    <script>
+     {% if use_matd3 %}
+     $('#editServer').hide();
+     $('#infoProject').collapse('show');
+     document.getElementById('headingChart').scrollIntoView();
+     {% endif %}
+    </script>
+    <script>
+     document
+       .getElementById('matd3-import-btn')
+       .addEventListener('click', function() {
+         const dataset_id =
+           document.getElementById('matd3-import-dataset-id').value;
+         window.location.href='/matd3?pk=' + dataset_id;
+       });
     </script>
     <script type="text/javascript">
         window.ga=window.ga||function(){(ga.q=ga.q||[]).push(arguments)};ga.l=+new Date;

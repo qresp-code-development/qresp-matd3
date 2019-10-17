@@ -103,6 +103,13 @@ class ChartForm(Form):
     # saveas = StringField('Save As', [validators.DataRequired()], description='Enter a name to identify the chart', render_kw={"placeholder": "Save Chart as"})
     extraFields = FieldList(FormField(ExtraForm), label='Extra Fields', description='Enter a label name and add a value to it',min_entries=1,id='extraChartFields')
 
+    def make_fields_readonly(self):
+        """Make most fields of the form instance readonly."""
+        for field in [self.caption, self.number, self.files, self.imageFile,
+                      self.notebookFile, self.properties]:
+            field.render_kw['readonly'] = True
+
+
 class ToolForm(Form):
     id = StringField('Id',render_kw={"style":"display:none;"})
     kind = RadioField('Kind', choices=[('software', 'Software'), ('experiment', 'Experiment')], default='software',description='Select Software or Experiment')
@@ -147,6 +154,15 @@ class ReferenceForm(Form):
     year = IntegerField('Year', [validators.DataRequired()], description='Enter year', render_kw={"placeholder": "Enter year"})
     URLs = StringField(label='URLs', description='Enter link(s) of the paper',render_kw={"placeholder": "Enter paper Urls"})
     school = StringField('School', description='Enter name of school where dissertation was presented', render_kw={"placeholder": "Enter name of school"})
+
+    def make_fields_readonly(self):
+        """Make most fields of the form instance readonly."""
+        self.journal.fullName.render_kw['readonly'] = True
+        for field in [self.DOI, self.title, self.page, self.volume, self.year]:
+            field.render_kw['readonly'] = True
+        for fields in self.authors:
+            for field in fields:
+                field.render_kw['readonly'] = True
 
 class DocumentationForm(Form):
     readme = TextAreaField('Readme',description='Enter additional documentation about paper', render_kw={"placeholder": "Enter additional documentation for paper","rows": 10, "cols": 11})
