@@ -983,15 +983,17 @@
      document.getElementById('headingChart').scrollIntoView();
      {% endif %}
     </script>
-    <script>
-     document
-       .getElementById('matd3-import-btn')
-       .addEventListener('click', function() {
-         const dataset_id =
-           document.getElementById('matd3-import-dataset-id').value;
-         window.location.href='/matd3?pk=' + dataset_id;
-       });
-    </script>
+    {% if use_matd3 %}
+      <script>
+       document
+         .getElementById('matd3-import-btn')
+         .addEventListener('click', function() {
+           const dataset_id =
+             document.getElementById('matd3-import-dataset-id').value;
+           window.location.href='/matd3?pk=' + dataset_id;
+         });
+      </script>
+    {% endif %}
     <script type="text/javascript">
         window.ga=window.ga||function(){(ga.q=ga.q||[]).push(arguments)};ga.l=+new Date;
         ga('create', 'UA-126882431-1', 'auto');
